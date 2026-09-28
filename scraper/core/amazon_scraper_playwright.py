@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Amazon.it Scraper using Playwright - Fixed version
+Amazon.it Scraper using Playwright - Fixed version with correct selectors
 """
 
 import asyncio
@@ -202,8 +202,6 @@ class AmazonPlaywrightScraper(BaseScraper):
             return result
         except Exception as e:
             logging.error(f"[Amazon] Details ERROR: {str(e)}")
-            import traceback
-            logging.error(f"[Amazon] Traceback: {traceback.format_exc()}")
             return {}
 
     async def _scrape_product_details_async(self, product_url: str) -> Dict[str, Any]:
@@ -219,7 +217,6 @@ class AmazonPlaywrightScraper(BaseScraper):
         }
 
         if not product_url or async_playwright is None:
-            logging.warning(f"[Amazon] Missing URL or Playwright: url={bool(product_url)}, pw={async_playwright is not None}")
             return details
 
         logging.info(f"[Amazon] Opening browser for details...")
@@ -232,46 +229,44 @@ class AmazonPlaywrightScraper(BaseScraper):
         
         try:
             product_url = self._ensure_absolute_url(product_url)
-            logging.info(f"[Amazon] Navigating to: {product_url[:100]}...")
+            logging.info(f"[Amazon] Navigating to product page...")
             await page_obj.goto(product_url, wait_until="load", timeout=60000)
-            logging.info(f"[Amazon] Page loaded, waiting for content...")
             await page_obj.wait_for_timeout(2000)
 
+            logging.info(f"[Amazon] Looking for specs table...")
             try:
-                logging.info(f"[Amazon] Looking for specs table...")
-                specs_rows = await page_obj.query_selector_all("table.a-keyvalue tr")
-                logging.info(f"[Amazon] Found {len(specs_rows)} spec rows")
-                for row in specs_rows:
+                spec_rows = await page_obj.query_selector_all("table.a-keyvalue tr")
+                logging.info(f"[Amazon] Found {len(spec_rows)} spec rows")
+                
+                for row in spec_rows:
                     try:
-                        key_elem = await row.query_selector("th")
-                        val_elem = await row.query_selector("td")
-                        
-                        if key_elem and val_elem:
-                            key = (await key_elem.text_content()).strip().lower()
-                            val = (await val_elem.text_content()).strip()
+                        cells = await row.query_selector_all("td")
+                        if len(cells) >= 2:
+                            key_text = (await cells[0].text_content()).strip().lower()
+                            val_text = (await cells[1].text_content()).strip()
                             
-                            if 'peso' in key or 'kg' in key:
-                                match = re.search(r'(\d+(?:[,\.]\d+)?)', val)
+                            if 'peso' in key_text or 'kg' in key_text:
+                                match = re.search(r'(\d+(?:[,\.]\d+)?)', val_text)
                                 if match:
                                     details['kg'] = float(match.group(1).replace(',', '.'))
                             
-                            elif 'serbatoio' in key or 'tank' in key:
-                                match = re.search(r'(\d+(?:[,\.]\d+)?)', val)
+                            elif 'serbatoio' in key_text or 'tank' in key_text:
+                                match = re.search(r'(\d+(?:[,\.]\d+)?)', val_text)
                                 if match:
                                     details['serbatoio_ml'] = float(match.group(1).replace(',', '.'))
                             
-                            elif 'cavo' in key or 'cable' in key:
-                                match = re.search(r'(\d+)', val)
+                            elif 'cavo' in key_text or 'cable' in key_text:
+                                match = re.search(r'(\d+)', val_text)
                                 if match:
                                     details['cavo_cm'] = int(match.group(1))
                             
-                            elif 'watt' in key or 'potenza' in key:
-                                match = re.search(r'(\d{3,4})', val)
+                            elif 'watt' in key_text or 'potenza' in key_text:
+                                match = re.search(r'(\d{3,4})', val_text)
                                 if match:
                                     details['potenza_w'] = int(match.group(1))
                             
-                            elif 'vapore' in key:
-                                match = re.search(r'(\d+)', val)
+                            elif 'vapore' in key_text:
+                                match = re.search(r'(\d+)', val_text)
                                 if match:
                                     details['vapore_setting'] = int(match.group(1))
                     except:
@@ -322,15 +317,25 @@ class AmazonPlaywrightScraper(BaseScraper):
             product_url = self._ensure_absolute_url(product_url)
             logging.info(f"[Amazon] Navigating to reviews page...")
             await page_obj.goto(product_url, wait_until="load", timeout=60000)
-            logging.info(f"[Amazon] Reviews page loaded, scrolling...")
+            logging.info(f"[Amazon] Reviews page loaded, waiting for review elements...")
             await page_obj.wait_for_timeout(2000)
 
+            # CRITICAL: Wait for review elements to actually load before parsing
+            try:
+                await page_obj.wait_for_selector("div[data-hook='review']", timeout=10000)
+                logging.info(f"[Amazon] Review elements detected, loading complete")
+            except:
+                logging.warning(f"[Amazon] Timeout waiting for review elements, continuing anyway")
+
+            # Scroll to load more reviews
             await page_obj.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await page_obj.wait_for_timeout(2000)
 
+            # Try to click "See all reviews" if available
             try:
                 see_reviews = await page_obj.query_selector("a[data-hook='see-all-reviews-link-foot']")
                 if see_reviews:
+                    logging.info(f"[Amazon] Clicking 'See all reviews' link...")
                     await see_reviews.click()
                     await page_obj.wait_for_timeout(3000)
             except:
@@ -339,6 +344,16 @@ class AmazonPlaywrightScraper(BaseScraper):
             logging.info(f"[Amazon] Looking for review elements...")
             review_divs = await page_obj.query_selector_all("div[data-hook='review']")
             logging.info(f"[Amazon] Found {len(review_divs)} review elements")
+
+            # DEBUG: Save the HTML of the first review for inspection
+            if review_divs and len(review_divs) > 0:
+                try:
+                    first_review_html = await review_divs[0].evaluate("el => el.outerHTML")
+                    with open("debug_review_html.txt", "w", encoding="utf-8") as f:
+                        f.write(first_review_html)
+                    logging.info(f"[Amazon] Saved first review HTML to debug_review_html.txt")
+                except:
+                    pass
 
             for idx, review_div in enumerate(review_divs[:max_reviews]):
                 try:
@@ -360,7 +375,7 @@ class AmazonPlaywrightScraper(BaseScraper):
         return reviews
 
     async def _parse_review_element_async(self, element, product_url: str) -> Optional[Dict[str, Any]]:
-        """Parse review element"""
+        """Parse review element - FIXED SELECTORS"""
         try:
             author = "Anonymous"
             try:
@@ -372,16 +387,21 @@ class AmazonPlaywrightScraper(BaseScraper):
 
             rating = None
             try:
-                rating_elem = await element.query_selector("span[data-hook='review-star-rating'] span")
+                # FIXED: Get rating from i[data-hook='review-star-rating'] class attribute
+                rating_elem = await element.query_selector("i[data-hook='review-star-rating']")
                 if rating_elem:
-                    rating_text = await rating_elem.text_content()
-                    rating = float(rating_text.split()[0])
+                    class_str = await rating_elem.get_attribute("class")
+                    if class_str:
+                        match = re.search(r'a-star-(\d+)', class_str)
+                        if match:
+                            rating = float(match.group(1))
             except:
                 pass
 
             title = ""
             try:
-                title_elem = await element.query_selector("a[data-hook='review-title']")
+                # FIXED: Use h5[data-hook='reviewTitle'] instead of a[data-hook='review-title']
+                title_elem = await element.query_selector("h5[data-hook='reviewTitle']")
                 if title_elem:
                     title = (await title_elem.text_content()).strip()
             except:
@@ -389,9 +409,15 @@ class AmazonPlaywrightScraper(BaseScraper):
 
             text = ""
             try:
-                text_elem = await element.query_selector("span[data-hook='review-body']")
+                # FIXED: Use the correct selector div[data-hook='reviewRichContentContainer']
+                text_elem = await element.query_selector("div[data-hook='reviewRichContentContainer']")
                 if text_elem:
                     text = (await text_elem.text_content()).strip()
+                else:
+                    # Fallback to old selector
+                    text_elem = await element.query_selector("span[data-hook='review-body']")
+                    if text_elem:
+                        text = (await text_elem.text_content()).strip()
             except:
                 pass
 
