@@ -1,35 +1,28 @@
 {
-  "total_reviews": 34,
-  "positive_count": 8,
-  "negative_count": 1,
-  "neutral_count": 25,
-  "positive_percentage": 23.5,
-  "negative_percentage": 2.9,
-  "neutral_percentage": 73.5,
-  "average_polarity": 0.112,
-  "average_subjectivity": 0.22,
+  "total_reviews": 21,
+  "positive_count": 3,
+  "negative_count": 0,
+  "neutral_count": 18,
+  "positive_percentage": 14.3,
+  "negative_percentage": 0.0,
+  "neutral_percentage": 85.7,
+  "average_polarity": 0.029,
+  "average_subjectivity": 0.043,
   "by_product": {
     "Imetec ZeroCalc Z1 2500 – Ferro da stiro a vapore 2200W": {
       "positive": 1,
       "negative": 0,
       "neutral": 7,
       "count": 8,
-      "avg_polarity": 0.046
+      "avg_polarity": 0.025
     },
     "Imetec Perfect Comfort – Ferro da stiro a vapore 2200W": {
-      "positive": 4,
+      "positive": 2,
       "negative": 0,
-      "neutral": 9,
+      "neutral": 11,
       "count": 13,
-      "avg_polarity": 0.218
-    },
-    "Tristar ST-8300 Ferro da stiro a vapore, 2000 W – Piastra in ceramica, temperatura regolabile, funzione vapore verticale e spray, autopulente, stiratura facile e veloce per risultati perfetti": {
-      "positive": 3,
-      "negative": 1,
-      "neutral": 9,
-      "count": 13,
-      "avg_polarity": 0.047
+      "avg_polarity": 0.031
     }
   },
-  "analysis_date": "2026-09-28T15:13:01.781520"
+  "analysis_date": "2026-09-28T15:51:28.366409"
 }

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Amazon.it Scraper using Playwright - Fixed version with correct selectors
+Amazon.it Scraper using Playwright - Fixed version
 """
 
 import asyncio
@@ -171,25 +171,47 @@ class AmazonPlaywrightScraper(BaseScraper):
         """Extract specs from title"""
         specs = {}
 
+        # Power (Potenza) - "2400W", "2400 W", "2400 watt"
         power_match = re.search(r'(\d{3,4})\s*W(?:att)?', title, re.IGNORECASE)
         if power_match:
             specs['potenza_w'] = int(power_match.group(1))
+            logging.debug(f"[Amazon] Title: Potenza {specs['potenza_w']}W")
 
-        kg_match = re.search(r'(\d+(?:[,\.]\d+)?)\s*kg', title, re.IGNORECASE)
+        # Weight (Kg) - "1.2 kg", "1,2 Chilogrammi"
+        kg_match = re.search(r'(\d+(?:[,\.]\d+)?)\s*(?:kg|chilogrammi?)', title, re.IGNORECASE)
         if kg_match:
             specs['kg'] = float(kg_match.group(1).replace(',', '.'))
+            logging.debug(f"[Amazon] Title: Peso {specs['kg']}kg")
 
-        tank_match = re.search(r'(\d+(?:[,\.]\d+)?)\s*(?:ml|cc)', title, re.IGNORECASE)
+        # Tank (Serbatoio) - "300ml", "1.5L", "da 1,8L", "serbatoio 200ml"
+        tank_match = re.search(r'(?:da\s+|serbatoio\s+)?(\d+(?:[,\.]\d+)?)\s*([mlL]+)', title, re.IGNORECASE)
         if tank_match:
-            specs['serbatoio_ml'] = float(tank_match.group(1).replace(',', '.'))
+            tank_val = float(tank_match.group(1).replace(',', '.'))
+            # Convert liters to ml
+            if tank_match.group(2).lower() in ['l', 'l']:
+                tank_val = tank_val * 1000
+            specs['serbatoio_ml'] = tank_val
+            logging.debug(f"[Amazon] Title: Serbatoio {specs['serbatoio_ml']}ml")
 
-        cord_match = re.search(r'cavo\s+(\d+)\s*cm', title, re.IGNORECASE)
+        # Cable/Cord (Cavo) - "cavo 180 cm", "180cm"
+        cord_match = re.search(r'(?:cavo\s+)?(\d+)\s*cm', title, re.IGNORECASE)
         if cord_match:
             specs['cavo_cm'] = int(cord_match.group(1))
+            logging.debug(f"[Amazon] Title: Cavo {specs['cavo_cm']}cm")
 
-        steam_match = re.search(r'(\d+)\s*impostazioni?\s+vapore', title, re.IGNORECASE)
+        # Steam output (Vapore) - "500g/min", "120 g", "colpo vapore 240g"
+        steam_match = re.search(r'(\d+)\s*g(?:/min)?', title, re.IGNORECASE)
         if steam_match:
             specs['vapore_setting'] = int(steam_match.group(1))
+            logging.debug(f"[Amazon] Title: Vapore {specs['vapore_setting']}g/min")
+
+        # Design material keywords
+        if any(mat in title.lower() for mat in ['steamglide', 'ceramica', 'ceramic']):
+            specs['design_material'] = 'ceramica'
+        elif any(mat in title.lower() for mat in ['inox', 'acciaio', 'stainless']):
+            specs['design_material'] = 'inox'
+        elif 'antiaderente' in title.lower():
+            specs['design_material'] = 'antiaderente'
 
         return specs
 
@@ -202,6 +224,8 @@ class AmazonPlaywrightScraper(BaseScraper):
             return result
         except Exception as e:
             logging.error(f"[Amazon] Details ERROR: {str(e)}")
+            import traceback
+            logging.error(f"[Amazon] Traceback: {traceback.format_exc()}")
             return {}
 
     async def _scrape_product_details_async(self, product_url: str) -> Dict[str, Any]:
@@ -217,6 +241,7 @@ class AmazonPlaywrightScraper(BaseScraper):
         }
 
         if not product_url or async_playwright is None:
+            logging.warning(f"[Amazon] Missing URL or Playwright: url={bool(product_url)}, pw={async_playwright is not None}")
             return details
 
         logging.info(f"[Amazon] Opening browser for details...")
@@ -229,53 +254,142 @@ class AmazonPlaywrightScraper(BaseScraper):
         
         try:
             product_url = self._ensure_absolute_url(product_url)
-            logging.info(f"[Amazon] Navigating to product page...")
+            logging.info(f"[Amazon] Navigating to: {product_url[:100]}...")
             await page_obj.goto(product_url, wait_until="load", timeout=60000)
+            logging.info(f"[Amazon] Page loaded, waiting for content...")
             await page_obj.wait_for_timeout(2000)
 
-            logging.info(f"[Amazon] Looking for specs table...")
+            # Get full page text for fallback regex extraction
+            page_text = await page_obj.content()
+            logging.info(f"[Amazon] Page text length: {len(page_text)}")
+
             try:
-                spec_rows = await page_obj.query_selector_all("table.a-keyvalue tr")
-                logging.info(f"[Amazon] Found {len(spec_rows)} spec rows")
-                
-                for row in spec_rows:
+                logging.info(f"[Amazon] Looking for specs table...")
+                specs_rows = await page_obj.query_selector_all("table.a-keyvalue tr")
+                logging.info(f"[Amazon] Found {len(specs_rows)} spec rows")
+                for row in specs_rows:
                     try:
-                        cells = await row.query_selector_all("td")
-                        if len(cells) >= 2:
-                            key_text = (await cells[0].text_content()).strip().lower()
-                            val_text = (await cells[1].text_content()).strip()
+                        key_elem = await row.query_selector("th")
+                        val_elem = await row.query_selector("td")
+                        
+                        if key_elem and val_elem:
+                            key = (await key_elem.text_content()).strip().lower()
+                            val = (await val_elem.text_content()).strip()
                             
-                            if 'peso' in key_text or 'kg' in key_text:
-                                match = re.search(r'(\d+(?:[,\.]\d+)?)', val_text)
-                                if match:
-                                    details['kg'] = float(match.group(1).replace(',', '.'))
+                            # ===== PESO / KG (FIXED) =====
+                            if 'peso' in key and 'dell' in key:  # "Peso dell'articolo"
+                                # Pattern: "1,2 Chilogrammi" or "1.2 kg"
+                                peso_match = re.search(r'(\d+(?:[,\.]\d+)?)\s*(chilogrammi|chilogrammo|kg|g)', val, re.IGNORECASE)
+                                if peso_match:
+                                    peso_val = float(peso_match.group(1).replace(',', '.'))
+                                    unit = peso_match.group(2).lower()
+                                    # Only convert from grams if explicitly "g" (not "chilogrammi" or "kg")
+                                    if unit == 'g':
+                                        peso_val = peso_val / 1000
+                                    details['kg'] = peso_val
+                                    logging.info(f"[Amazon] Extracted Peso: {details['kg']} kg from '{val}'")
                             
-                            elif 'serbatoio' in key_text or 'tank' in key_text:
-                                match = re.search(r'(\d+(?:[,\.]\d+)?)', val_text)
-                                if match:
-                                    details['serbatoio_ml'] = float(match.group(1).replace(',', '.'))
+                            # ===== SERBATOIO / TANK (IMPROVED) =====
+                            elif 'serbatoio' in key or 'tank' in key:
+                                # Pattern: "1.5 L" or "300 ml" or "1,5 litri"
+                                tank_match = re.search(r'(\d+(?:[,\.]\d+)?)\s*([mlL]+|litri?)', val, re.IGNORECASE)
+                                if tank_match:
+                                    tank_val = float(tank_match.group(1).replace(',', '.'))
+                                    unit = tank_match.group(2).lower()
+                                    # Convert liters to ml if unit is L or litri
+                                    if unit in ['l', 'litri', 'litro', 'litri']:
+                                        tank_val = tank_val * 1000
+                                    elif unit in ['ml', 'cc']:  # already in ml
+                                        pass
+                                    details['serbatoio_ml'] = tank_val
+                                    logging.info(f"[Amazon] Extracted Serbatoio: {details['serbatoio_ml']} ml from '{val}'")
                             
-                            elif 'cavo' in key_text or 'cable' in key_text:
-                                match = re.search(r'(\d+)', val_text)
-                                if match:
-                                    details['cavo_cm'] = int(match.group(1))
+                            # ===== VAPORE / STEAM FLOW (IMPROVED) =====
+                            elif 'vapore' in key or 'steam' in key:
+                                # Pattern: "120 g/min" or "500 g" or "30g/min"
+                                vapor_match = re.search(r'(\d+)\s*(?:g(?:/min)?)', val, re.IGNORECASE)
+                                if vapor_match:
+                                    details['vapore_setting'] = int(vapor_match.group(1))
+                                    logging.info(f"[Amazon] Extracted Vapore: {details['vapore_setting']} g/min from '{val}'")
                             
-                            elif 'watt' in key_text or 'potenza' in key_text:
-                                match = re.search(r'(\d{3,4})', val_text)
-                                if match:
-                                    details['potenza_w'] = int(match.group(1))
+                            # ===== POTENZA / POWER (IMPROVED) =====
+                            elif 'watt' in key or 'potenza' in key or 'power' in key:
+                                # Pattern: "2400 W" or "2400W" or "2400"
+                                power_match = re.search(r'(\d{3,4})\s*[wW]?', val)
+                                if power_match:
+                                    details['potenza_w'] = int(power_match.group(1))
+                                    logging.info(f"[Amazon] Extracted Potenza: {details['potenza_w']} W from '{val}'")
                             
-                            elif 'vapore' in key_text:
-                                match = re.search(r'(\d+)', val_text)
-                                if match:
-                                    details['vapore_setting'] = int(match.group(1))
-                    except:
+                            # ===== CAVO / CABLE LENGTH =====
+                            elif 'cavo' in key or 'cable' in key or 'cord' in key:
+                                # Pattern: "180 cm" or "1.8 m" or "180cm"
+                                cable_match = re.search(r'(\d+(?:[,\.]\d+)?)\s*(cm|m(?!m))', val, re.IGNORECASE)
+                                if cable_match:
+                                    cable_val = float(cable_match.group(1).replace(',', '.'))
+                                    # Convert meters to cm if needed
+                                    if cable_match.group(2).lower() == 'm':
+                                        cable_val = cable_val * 100
+                                    details['cavo_cm'] = int(cable_val)
+                                    logging.info(f"[Amazon] Extracted Cavo: {details['cavo_cm']} cm from '{val}'")
+                            
+                            # ===== DESIGN MATERIAL =====
+                            elif 'piastra' in key or 'plate' in key or 'rivestimento' in key:
+                                if any(mat in val.lower() for mat in ['ceramica', 'ceramic']):
+                                    details['design_material'] = 'ceramica'
+                                elif any(mat in val.lower() for mat in ['inox', 'stainless', 'acciaio']):
+                                    details['design_material'] = 'inox'
+                                elif any(mat in val.lower() for mat in ['antiaderente', 'non-stick']):
+                                    details['design_material'] = 'antiaderente'
+                                logging.info(f"[Amazon] Material: {details['design_material']} from '{val}'")
+                                
+                    except Exception as e:
+                        logging.debug(f"[Amazon] Row parse error: {str(e)}")
                         continue
-            except:
-                pass
+            except Exception as e:
+                logging.warning(f"[Amazon] Table parsing failed: {str(e)}")
+
+            # ===== FALLBACK: Extract from page text using regex =====
+            if not details['kg']:
+                # Pattern: "Peso dell'articolo   1,2 Chilogrammi" or similar
+                peso_match = re.search(r'Peso\s+dell[.\']articolo\s+([0-9,\.]+)\s*(Chilogrammi|chilogrammi|kg|g)', page_text)
+                if peso_match:
+                    peso_val = float(peso_match.group(1).replace(',', '.'))
+                    unit = peso_match.group(2).lower()
+                    # Only convert if explicitly "g" (not "kg" or "chilogrammi")
+                    if unit == 'g':
+                        peso_val = peso_val / 1000
+                    details['kg'] = peso_val
+                    logging.info(f"[Amazon] Fallback extracted Peso: {details['kg']} kg from '{peso_match.group(0)}'")
+
+            if not details['serbatoio_ml']:
+                # Pattern: "Serbatoio: 300ml", "Serbatoio da 1.5L", "da 1,5L", etc.
+                serbatoio_match = re.search(r'(?:[Ss]erbatoio|tank|da)\s*[:\s]*([0-9,\.]+)\s*([mlL]+|litri?)', page_text, re.IGNORECASE)
+                if serbatoio_match:
+                    tank_val = float(serbatoio_match.group(1).replace(',', '.'))
+                    unit = serbatoio_match.group(2).lower()
+                    # Convert liters to ml if needed
+                    if unit in ['l', 'litri', 'litro', 'litri']:
+                        tank_val = tank_val * 1000
+                    details['serbatoio_ml'] = tank_val
+                    logging.info(f"[Amazon] Fallback extracted Serbatoio: {details['serbatoio_ml']} ml from '{serbatoio_match.group(0)}'")
+
+            if not details['potenza_w']:
+                potenza_match = re.search(r'[Pp]otenza[:\s]+(\d{3,4})\s*[wW]?', page_text)
+                if potenza_match:
+                    details['potenza_w'] = int(potenza_match.group(1))
+                    logging.info(f"[Amazon] Fallback extracted Potenza: {details['potenza_w']} W")
+
+            if not details['vapore_setting']:
+                # Look for "colpo vapore" or "vapore continuo"
+                vapore_match = re.search(r'[Cc]olpo\s+[Vv]apore[:\s]+(\d+)\s*g(?:/min)?', page_text)
+                if vapore_match:
+                    details['vapore_setting'] = int(vapore_match.group(1))
+                    logging.info(f"[Amazon] Fallback extracted Vapore: {details['vapore_setting']} g/min")
 
         except Exception as e:
             logging.error(f"[Amazon] Detail error: {str(e)}")
+            import traceback
+            logging.error(f"[Amazon] Traceback: {traceback.format_exc()}")
         finally:
             await page_obj.close()
             await context.close()
@@ -375,7 +489,7 @@ class AmazonPlaywrightScraper(BaseScraper):
         return reviews
 
     async def _parse_review_element_async(self, element, product_url: str) -> Optional[Dict[str, Any]]:
-        """Parse review element - FIXED SELECTORS"""
+        """Parse review element"""
         try:
             author = "Anonymous"
             try:
@@ -387,21 +501,16 @@ class AmazonPlaywrightScraper(BaseScraper):
 
             rating = None
             try:
-                # FIXED: Get rating from i[data-hook='review-star-rating'] class attribute
-                rating_elem = await element.query_selector("i[data-hook='review-star-rating']")
+                rating_elem = await element.query_selector("span[data-hook='review-star-rating'] span")
                 if rating_elem:
-                    class_str = await rating_elem.get_attribute("class")
-                    if class_str:
-                        match = re.search(r'a-star-(\d+)', class_str)
-                        if match:
-                            rating = float(match.group(1))
+                    rating_text = await rating_elem.text_content()
+                    rating = float(rating_text.split()[0])
             except:
                 pass
 
             title = ""
             try:
-                # FIXED: Use h5[data-hook='reviewTitle'] instead of a[data-hook='review-title']
-                title_elem = await element.query_selector("h5[data-hook='reviewTitle']")
+                title_elem = await element.query_selector("a[data-hook='review-title']")
                 if title_elem:
                     title = (await title_elem.text_content()).strip()
             except:
@@ -409,13 +518,12 @@ class AmazonPlaywrightScraper(BaseScraper):
 
             text = ""
             try:
-                # FIXED: Use the correct selector div[data-hook='reviewRichContentContainer']
-                text_elem = await element.query_selector("div[data-hook='reviewRichContentContainer']")
+                text_elem = await element.query_selector("span[data-hook='review-body']")
                 if text_elem:
                     text = (await text_elem.text_content()).strip()
                 else:
-                    # Fallback to old selector
-                    text_elem = await element.query_selector("span[data-hook='review-body']")
+                    # Try alternative selector for review text
+                    text_elem = await element.query_selector("div.a-row.a-spacing-small span")
                     if text_elem:
                         text = (await text_elem.text_content()).strip()
             except:
