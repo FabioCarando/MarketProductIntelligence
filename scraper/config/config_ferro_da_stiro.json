@@ -1,0 +1,257 @@
+{
+  "project": {
+    "category": "ferro_da_stiro",
+    "description": "Competitive analysis for irons",
+    "covariate_mapping": {
+      "kg": "Weight in kilograms",
+      "serbatoio": "Tank capacity in milliliters",
+      "cavo": "Cable length in centimeters",
+      "vapore": "Steam settings / levels",
+      "potenza": "Power in watts",
+      "design": "Color and materials"
+    }
+  },
+  "sources": {
+    "amazon_it": {
+      "enabled": true,
+      "url_pattern": "https://www.amazon.it/s?k=ferro+da+stiro",
+      "scraper_type": "selenium",
+      "selectors": {
+        "product_link": "a.a-link-normal.s-underline-text.s-underline-link-text.s-link",
+        "product_title": "h2 span",
+        "product_price": "span.a-price-whole",
+        "product_rating": "span.a-icon-star-small span.a-icon-star-small",
+        "review_count": "span.a-size-base"
+      },
+      "product_detail_page": {
+        "title": "#productTitle",
+        "price": "span.a-price.a-text-price.a-size-medium.apexPriceToPay",
+        "rating": "span.a-icon-star span.a-icon-star",
+        "review_count": "span.a-size-base",
+        "weight": "td:contains('Peso') ~ td",
+        "dimensions": "td:contains('Dimensioni') ~ td",
+        "power": "td:contains('Potenza') ~ td",
+        "reviews_pagination": "a.s-pagination-next"
+      },
+      "review_page": {
+        "review_text": "span.a-size-base.review-text.review-text-content",
+        "review_rating": "i.review-rating span",
+        "review_author": "span.a-profile-name",
+        "review_date": "span.review-date",
+        "helpful_count": "span[data-hook='helpful-vote-statement']"
+      }
+    },
+    "ebay_it": {
+      "enabled": true,
+      "url_pattern": "https://www.ebay.it/sch/i.html?_nkw=ferro+da+stiro",
+      "scraper_type": "beautiful_soup",
+      "selectors": {
+        "product_item": "div.s-item",
+        "product_link": "a.s-item__link",
+        "product_title": "h2.s-item__title",
+        "product_price": "span.s-item__price",
+        "product_rating": "span.SECONDARY_INFO"
+      },
+      "product_detail_page": {
+        "title": "h1.it-title",
+        "price": "span.notranslate.vi-VR-cvipPrice",
+        "rating": "div.reviewsSummary",
+        "condition": "div.section-desc",
+        "specifications": "div.ds_div td"
+      }
+    },
+    "rowenta_official": {
+      "enabled": true,
+      "url_pattern": "https://www.rowenta.it/",
+      "scraper_type": "selenium",
+      "selectors": {
+        "product_link": "a[data-product-id]",
+        "product_title": "h2.product-name",
+        "product_price": "span.price",
+        "specs_table": "table.specs-table"
+      },
+      "product_detail_page": {
+        "title": "h1.product-title",
+        "price": "span.price-current",
+        "description": "div.product-description",
+        "kg": "tr:contains('Peso') td.value",
+        "power": "tr:contains('Potenza') td.value",
+        "cable": "tr:contains('Cavo') td.value",
+        "steam": "tr:contains('Vapore') td.value",
+        "tank": "tr:contains('Serbatoio') td.value"
+      }
+    },
+    "opinioni_it": {
+      "enabled": true,
+      "url_pattern": "https://www.opinioni.it/opinioni/",
+      "scraper_type": "beautiful_soup",
+      "selectors": {
+        "product_link": "a.productName",
+        "product_title": "h1.productTitle",
+        "average_rating": "span.rateValue"
+      },
+      "review_page": {
+        "reviews_container": "div.review",
+        "review_text": "p.review_text",
+        "review_rating": "span.rating",
+        "review_author": "span.reviewer_name",
+        "review_date": "span.review_date",
+        "review_title": "h3.review_title"
+      }
+    },
+    "mediaworld": {
+      "enabled": false,
+      "url_pattern": "https://www.mediaworld.it/",
+      "scraper_type": "selenium",
+      "selectors": {
+        "product_link": "a.product-link",
+        "product_title": "h2.product-name",
+        "product_price": "span.product-price"
+      }
+    },
+    "lidl": {
+      "enabled": false,
+      "url_pattern": "https://www.lidl.it/",
+      "scraper_type": "selenium",
+      "selectors": {
+        "product_link": "a[data-test='product']",
+        "product_title": "h3.product-name",
+        "product_price": "span.price"
+      }
+    }
+  },
+  "extraction_rules": {
+    "product_selection": {
+      "method": "top_sellers_rated_price_range",
+      "target_count": 10,
+      "filters": {
+        "min_reviews": 10,
+        "min_rating": 3.0,
+        "price_range": {
+          "min_eur": 30,
+          "max_eur": 200
+        }
+      },
+      "distribution": {
+        "budget": 3,
+        "midrange": 4,
+        "premium": 3
+      }
+    },
+    "covariate_extraction": {
+      "kg": {
+        "patterns": [
+          "\\d+[.,]\\d+ kg",
+          "peso[\\s:]*([\\d.,]+)\\s*kg",
+          "weight[\\s:]*([\\d.,]+)\\s*kg"
+        ],
+        "unit": "kg",
+        "normalize": true
+      },
+      "serbatoio": {
+        "patterns": [
+          "\\d+ ml",
+          "serbatoio[\\s:]*([\\d.]+)\\s*ml",
+          "tank[\\s:]*([\\d.]+)\\s*ml"
+        ],
+        "unit": "ml",
+        "normalize": true
+      },
+      "cavo": {
+        "patterns": [
+          "\\d+ cm",
+          "cavo[\\s:]*([\\d.]+)\\s*cm",
+          "cable[\\s:]*([\\d.]+)\\s*m"
+        ],
+        "unit": "cm",
+        "normalize": true
+      },
+      "vapore": {
+        "patterns": [
+          "\\d+ livelli",
+          "vapore[\\s:]*([\\d]+)",
+          "steam[\\s:]*([\\d]+)\\s*levels"
+        ],
+        "type": "count",
+        "normalize": false
+      },
+      "potenza": {
+        "patterns": [
+          "\\d+ w",
+          "potenza[\\s:]*([\\d.]+)\\s*w",
+          "power[\\s:]*([\\d.]+)\\s*w"
+        ],
+        "unit": "w",
+        "normalize": true
+      },
+      "design": {
+        "type": "descriptive",
+        "keywords": ["colore", "materiale", "ergonomico", "design", "color", "material"]
+      }
+    },
+    "review_extraction": {
+      "min_review_length": 20,
+      "languages": ["it", "en"],
+      "extract_fields": ["text", "rating", "date", "author", "helpful_count"],
+      "max_reviews_per_product": 100,
+      "filter_spam": true
+    }
+  },
+  "nlp_processing": {
+    "sentiment_analysis": {
+      "enabled": true,
+      "method": "vader",
+      "language": "italian",
+      "threshold": {
+        "positive": 0.3,
+        "negative": -0.3,
+        "neutral": "between -0.3 and 0.3"
+      }
+    },
+    "keyword_extraction": {
+      "enabled": true,
+      "method": "tfidf",
+      "num_keywords": 20,
+      "min_frequency": 3,
+      "stop_words": "italian",
+      "categories": {
+        "problems": ["non funziona", "difetto", "rotto", "short", "too heavy"],
+        "positive": ["ottimo", "bellissimo", "eccellente", "best"],
+        "features": ["leggero", "vapore", "potenza", "serbatoio", "cavo"]
+      }
+    }
+  },
+  "database": {
+    "type": "postgresql",
+    "alternative": "mongodb",
+    "connection": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "webscraping",
+      "ssl": false
+    }
+  },
+  "scraping_settings": {
+    "delay_between_requests": 2,
+    "max_retries": 3,
+    "timeout_seconds": 30,
+    "user_agents": [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+    ],
+    "respect_robots_txt": true,
+    "headless_browser": true,
+    "javascript_rendering": true
+  },
+  "output": {
+    "report_format": "excel",
+    "sheets": [
+      "competitive_analysis",
+      "sentiment_summary",
+      "problems_keywords",
+      "competitor_details"
+    ],
+    "export_path": "./reports/"
+  }
+}

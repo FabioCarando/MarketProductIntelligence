@@ -1,0 +1,11 @@
+Rank,Nome Prodotto,Brand,Segmento,Prezzo EUR,Rating,Review Count,Kg,Serbatoio ml,Cavo cm,Vapore Livelli,Potenza W,Colore,Materiale,Sentiment Score,Top Pratica,Main Lamento,Url
+1,DW5080,Rowenta,Mid-range,89,4.5,247,1.6,300,200,4,2400,Nero/Bianco,Ceramica/Alluminio,0.71,"Qualità costruzione, Riscaldamento rapido","Peso elevato",amazon.it
+2,GC3410/80,Philips,Budget,65,4.2,189,1.9,280,160,2,2400,Bianco/Argento,Plastica,0.62,"Riscaldamento veloce, Buon prezzo","Cavo corto",amazon.it
+3,DW7080,Rowenta,Premium,129,4.3,213,1.8,350,210,5,2800,Nero,Ceramica Premium,0.68,"Suola eccellente, Ergonomia","Serbatoio piccolino",mediaworld.it
+4,GC2405/20,Philips,Budget,45,3.9,156,2.1,250,170,1,2000,Bianco,Plastica,0.51,"Prezzo accessibile, Semplicità","Non scalda uniformemente",ebay.it
+5,A3220,Ariete,Budget,52,3.8,142,1.5,200,150,2,2200,Rosso/Nero,Plastica,0.48,"Leggero, Design moderno","Qualità costruzione",amazon.it
+6,FV4020,Tefal,Mid-range,72,4.1,178,1.9,280,180,3,2400,Nero/Grigio,Alluminio,0.59,"Suola Vapor Glide, Velocità","Vapore instabile",tefal.it
+7,DW7060,Rowenta,Premium,115,4.2,198,1.7,320,200,4,2600,Nero,Ceramica,0.65,"Controllo vapore preciso, Silenzioso","Cavo rigido",rowenta.it
+8,GC4567/80,Philips,Premium,95,4.3,221,1.8,300,190,3,2500,Nero,Ceramica,0.67,"Tecnologia PerfectCare, Affidabile","Prezzo elevato",amazon.it
+9,A2100,Ariete,Budget,35,3.6,98,2.2,180,140,1,1800,Bianco,Plastica,0.42,"Entry-level accessibile, Compatto","Scarsa qualità suola",amazon.it
+10,FV2660,Tefal,Mid-range,58,4.0,134,1.7,260,160,2,2200,Bianco/Nero,Alluminio,0.55,"Leggero, Pratico, Buon prezzo","Cavo corto",tefal.it

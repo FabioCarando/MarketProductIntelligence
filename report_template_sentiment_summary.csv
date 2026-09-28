@@ -1,0 +1,11 @@
+Ranking,Prodotto,Brand,Prezzo EUR,Rating Avg,Sentiment Score,% Positivi,% Neutrali,% Negativi,Review Count,Top Praise,Main Complaint,Segment
+1,DW5080,Rowenta,89,4.5,0.71,75%,15%,10%,247,"Qualità costruzione, Riscaldamento veloce","Peso elevato",Mid-range
+2,GC3410/80,Philips,65,4.2,0.62,68%,18%,14%,189,"Riscaldamento veloce, Prezzo","Cavo corto",Budget
+3,DW7080,Rowenta,129,4.3,0.68,72%,16%,12%,213,"Suola, Ergonomia","Serbatoio piccolo",Premium
+4,GC2405/20,Philips,45,3.9,0.51,58%,25%,17%,156,"Prezzo, Semplicità","Non scalda uniformemente",Budget
+5,A3220,Ariete,52,3.8,0.48,55%,27%,18%,142,"Design, Leggerezza","Qualità costruzione",Budget
+6,Tefal FV4020,Tefal,72,4.1,0.59,65%,20%,15%,178,"Vapor Glide suola, Rapidità","Vapore instabile",Mid-range
+7,DW7060,Rowenta,115,4.2,0.65,70%,17%,13%,198,"Controllo vapore, Silenzioso","Cavo rigido",Premium
+8,GC4567/80,Philips,95,4.3,0.67,71%,16%,13%,221,"Tecnologia, Affidabilità","Caro",Premium
+9,A2100,Ariete,35,3.6,0.42,50%,32%,18%,98,"Entry level, Compatto","Scarsa qualità suola",Budget
+10,Tefal FV2660,Tefal,58,4.0,0.55,62%,24%,14%,134,"Leggero, Pratico","Cavo corto",Mid-range
